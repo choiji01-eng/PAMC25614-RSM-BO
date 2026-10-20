@@ -1,0 +1,48 @@
+import numpy as np, matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+plt.rcParams.update({"font.family":"DejaVu Sans","font.size":9})
+X=np.array([[6.42,8.50,0.139,6.78],[5.78,11.89,0.106,5.54],[7.85,13.84,0.151,3.93],[6.06,6.55,0.034,5.37],[6.97,10.23,0.081,6.40],[8.63,7.64,0.067,4.57],[5.05,12.09,0.182,4.43],[7.43,9.13,0.013,3.26],
+[6.83,11.14,0.093,6.66],[6.79,6.00,0.091,3.00],[7.61,13.98,0.000,6.08],[8.66,12.38,0.096,6.54],[7.31,10.95,0.070,7.00],[7.46,11.99,0.095,6.17],[7.60,14.00,0.114,5.93],[7.70,11.95,0.119,6.00],[8.80,14.00,0.200,6.01],[7.43,12.29,0.111,6.11],[7.26,12.68,0.134,6.28],[7.25,12.38,0.118,6.12]])
+y=np.array([30.11,32.89,31.04,23.12,37.31,22.10,19.15,18.99,37.11,15.47,28.92,36.15,34.17,40.04,37.92,40.07,34.09,41.21,40.51,39.73])
+gpp=np.array([36.53,24.37,39.81,35.40,38.48,35.94,39.41,38.90,35.18,40.12,40.62,40.87])
+ei=np.array([0.939,0.031,3.257,0.812,1.450,0.026,0.649,0.208,0.283,0.197,0.283,0.092])
+LB=np.array([4.8,6,0,3.]); UB=np.array([8.8,14,0.2,7.])
+n=np.arange(1,21); inc=np.maximum.accumulate(y)
+fig=plt.figure(figsize=(11,8.2))
+a=fig.add_axes([0.07,0.56,0.55,0.38])
+a.axvspan(0.5,8.5,color="#eeeeee"); a.text(4.5,14.2,"Latin hypercube initialization",ha="center",fontsize=8,color="#555")
+a.step(n,inc,where="post",color="#1f77b4",lw=1.8,label="Best measured so far (incumbent)")
+a.plot(n[:8],y[:8],"o",mfc="white",mec="#1f77b4",ms=7,mew=1.5,label="Initialization point")
+expl=[9,10,16]; impr=[13,15,17]
+for i in range(8,20):
+    c="#C0392B" if i in impr else ("#7F8C8D" if i in expl else "#E67E22")
+    a.plot(n[i],y[i],"o",color=c,ms=7.5,zorder=3)
+    a.text(n[i],y[i]+(0.9 if i not in expl else -1.9),f"I{i-7}",ha="center",fontsize=7,color=c)
+a.plot([],[],"o",color="#E67E22",label="Closed-loop point"); a.plot([],[],"o",color="#7F8C8D",label="Exploratory point (high σ; Iter-2, 3, 9)")
+a.plot([],[],"o",color="#C0392B",label="Incumbent improved (Iter-6, 8, 10)")
+a.axhline(41.60,color="k",ls="--",lw=0.9); a.text(9.0,42.2,"RSM confirmation mean (41.60 U/L)",fontsize=7.5)
+for i,t in zip([13,15,17],["40.04","40.07","41.21"]): pass
+a.set_xlim(0.5,20.5); a.set_ylim(13,44.5); a.set_xticks([1,4,8,10,12,14,16,18,20])
+a.set_xlabel("Design-point number (8 initialization + 12 closed-loop)"); a.set_ylabel("Measured protease activity (U/L)")
+a.legend(fontsize=7,loc="lower right",frameon=True,framealpha=0.9); a.set_title("(a) Response trajectory",loc="left",weight="bold")
+b=fig.add_axes([0.07,0.08,0.55,0.36]); it=np.arange(1,13)
+b.plot(it,y[8:],"o-",color="#E67E22",lw=1.4,label="Measured (mean of 3 flasks)")
+b.plot(it,gpp,"s--",color="#1f77b4",mfc="white",lw=1.2,label="GP prediction made before the run")
+b.set_xlabel("Closed-loop iteration"); b.set_ylabel("Activity (U/L)"); b.set_xticks(it); b.set_ylim(12,45)
+b2=b.twinx(); b2.bar(it,ei,width=0.45,color="#C0392B",alpha=0.28,label="EI that selected the run")
+b2.set_ylabel("Expected Improvement (U/L)",color="#C0392B"); b2.set_ylim(0,6.5); b2.tick_params(axis="y",colors="#C0392B")
+h1,l1=b.get_legend_handles_labels(); h2,l2=b2.get_legend_handles_labels(); b.legend(h1+h2,l1+l2,fontsize=7,loc="lower right")
+b.set_title("(b) Prospective GP prediction, EI and measured response",loc="left",weight="bold")
+for s_ in ("top",): b.spines[s_].set_visible(False)
+c=fig.add_axes([0.71,0.08,0.27,0.86]); U=(X-LB)/(UB-LB); xs=np.arange(4)
+cm=plt.cm.viridis
+for i in range(20):
+    c.plot(xs,U[i],color=cm(i/19),lw=2.2 if i>=17 else 1.0,alpha=0.95 if i>=8 else 0.55,linestyle="-" if i>=8 else ":")
+rsm=(np.array([7.568,11.985,0.125,5.706])-LB)/(UB-LB); gp=(np.array([7.428,12.128,0.121,6.179])-LB)/(UB-LB)
+c.plot(xs,rsm,"k--",lw=2,marker="x",ms=8,label="RSM stationary point"); c.plot(xs,gp,"-",color="#C0392B",lw=2,marker="*",ms=11,label="GP recommendation")
+c.set_xticks(xs); c.set_xticklabels(["Initial\npH","Dextrose","Triton\nX-100","Yeast\nextract"]); c.set_ylabel("Scaled factor level (0 = lower bound, 1 = upper bound)")
+c.set_ylim(-0.05,1.05); c.grid(axis="x",color="#bbb")
+sm=plt.cm.ScalarMappable(cmap=cm,norm=plt.Normalize(1,20)); cb=fig.colorbar(sm,ax=c,orientation="horizontal",pad=0.09,fraction=0.04); cb.set_label("Design-point number (dotted: initialization)")
+c.legend(fontsize=7.5,loc="lower center",bbox_to_anchor=(0.5,1.0),ncol=1,frameon=False); c.set_title("(c) Location of design points",loc="left",weight="bold",pad=42)
+fig.savefig("Fig5_BO_trajectory.png",dpi=300,bbox_inches="tight",facecolor="white")

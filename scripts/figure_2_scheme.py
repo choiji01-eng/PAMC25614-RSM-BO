@@ -1,0 +1,63 @@
+import numpy as np, matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
+from scipy.stats import norm
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import Matern, WhiteKernel, ConstantKernel as C
+plt.rcParams.update({"font.family":"DejaVu Sans","font.size":9})
+fig = plt.figure(figsize=(11,6.2))
+ax = fig.add_axes([0.0,0.0,0.6,1.0]); ax.set_xlim(0,10); ax.set_ylim(0,12); ax.axis("off")
+def box(x,y,w,h,txt,fc,ec="#333",fs=8.6,bold_first=True):
+    ax.add_patch(FancyBboxPatch((x,y),w,h,boxstyle="round,pad=0.08,rounding_size=0.18",fc=fc,ec=ec,lw=1.1))
+    lines = txt.split("\n")
+    ax.text(x+w/2,y+h-0.28,lines[0],ha="center",va="top",fontsize=fs+0.4,weight="bold")
+    ax.text(x+w/2,y+h-0.68,"\n".join(lines[1:]),ha="center",va="top",fontsize=fs-0.6,linespacing=1.35)
+def arr(x1,y1,x2,y2,c="#333",rad=0.0,txt=None,tx=0,ty=0):
+    ax.add_patch(FancyArrowPatch((x1,y1),(x2,y2),arrowstyle="-|>",mutation_scale=13,color=c,lw=1.3,connectionstyle=f"arc3,rad={rad}"))
+    if txt: ax.text(tx,ty,txt,fontsize=8,color=c,ha="center",va="center",style="italic")
+ax.text(0.15,11.8,"(a)",fontsize=12,weight="bold",va="top")
+c_in, c_lab, c_cmp, c_out = "#E8F1FB","#FDF0E1","#EAF6EA","#F3E8F7"
+box(0.7,10.25,4.2,1.35,"1. Common factor domain\nInitial pH 4.8–8.8; dextrose 6–14 g/L;\nTriton X-100 0–0.20 g/L; yeast extract 3–7 g/L",c_in)
+box(0.7,8.35,4.2,1.35,"2. Initial design (n = 8)\nLatin hypercube sample\n(twice the number of factors)",c_in)
+box(0.7,6.15,4.2,1.6,"3. Wet-lab evaluation\n96 h flask cultivation (20 °C, 150 rpm),\n3 independent flasks per design point;\nAAPF protease assay → activity y (U/L)",c_lab)
+box(0.7,4.15,4.2,1.4,"4. Update data set\nDₙ = {(xᵢ, yᵢ), i = 1…n}\n(triplicate-mean responses)",c_cmp)
+box(5.5,4.15,4.2,1.4,"5. Refit Gaussian-process surrogate\nMatérn 5/2 ARD + white noise; hyper-\nparameters by marginal likelihood → μ(x), σ(x)",c_cmp)
+box(5.5,6.15,4.2,1.6,"6. Maximize Expected Improvement\nEI(x) = (μ − f* − ξ)Φ(Z) + σφ(Z)\nexploitation (high μ) vs exploration (high σ)\n→ next composition xₙ₊₁",c_cmp)
+box(5.5,8.35,4.2,1.35,"7. Preparable composition\nround to stock-solution resolution;\nfidelity distance recorded (Table 2)",c_cmp)
+ax.add_patch(FancyBboxPatch((3.05,1.95),3.9,1.3,boxstyle="round,pad=0.08,rounding_size=0.5",fc="#FFFBE6",ec="#333",lw=1.1))
+ax.text(5.0,2.6,"Budget reached?\n(20 design points in total)",ha="center",va="center",fontsize=8.6,weight="bold")
+box(1.7,0.1,6.6,1.25,"8. Recommendation and confirmation\nmaximizer of the final GP posterior mean → confirmation cultivation (3 flasks)",c_out)
+arr(2.8,10.25,2.8,9.78); arr(2.8,8.35,2.8,7.83); arr(2.8,6.15,2.8,5.63)
+arr(4.98,4.85,5.42,4.85)
+arr(7.6,5.63,7.6,6.07); arr(7.6,7.83,7.6,8.27)
+# closed loop back: from box7 top-left to box3
+ax.add_patch(FancyArrowPatch((5.5,9.0),(4.98,7.0),arrowstyle="-|>",mutation_scale=13,color="#C0392B",lw=1.5,connectionstyle="arc3,rad=0.35"))
+ax.add_patch(FancyBboxPatch((5.5,10.35),4.2,1.15,boxstyle="round,pad=0.08,rounding_size=0.18",fc="white",ec="#C0392B",lw=1.1,ls="--"))
+ax.text(7.6,10.93,"Closed loop (steps 3 → 4 → 5 → 6 → 7 → 3)\n12 iterations executed one at a time,\neach gated by a complete 96 h cultivation",fontsize=7.8,color="#C0392B",ha="center",va="center",linespacing=1.35)
+arr(2.8,4.15,4.2,3.3)
+ax.text(2.55,3.6,"after each\nmeasurement",fontsize=7.4,ha="center",style="italic",color="#555")
+arr(6.0,3.3,7.0,4.07,c="#C0392B"); ax.text(7.25,3.55,"No",color="#C0392B",fontsize=8.5,weight="bold")
+arr(5.0,1.95,5.0,1.43,c="#1E7B34"); ax.text(5.25,1.67,"Yes",color="#1E7B34",fontsize=8.5,weight="bold")
+# (b) illustrative 1D GP + EI
+rng=np.random.default_rng(3)
+g=lambda x: 30+9*np.exp(-((x-0.62)/0.22)**2)-6*np.exp(-((x-0.15)/0.1)**2)
+Xo=np.array([0.05,0.22,0.4,0.5,0.85,0.97]); yo=g(Xo)+rng.normal(0,0.4,len(Xo))
+gp=GaussianProcessRegressor(C(1.0)*Matern(length_scale=0.17,nu=2.5)+WhiteKernel(0.01),normalize_y=True,optimizer=None).fit(Xo[:,None],yo)
+xs=np.linspace(0,1,400); m,s=gp.predict(xs[:,None],return_std=True)
+fb=yo.max(); z=(m-fb-0.01)/np.maximum(s,1e-9); ei=(m-fb-0.01)*norm.cdf(z)+s*norm.pdf(z)
+a1=fig.add_axes([0.66,0.55,0.32,0.38]); a2=fig.add_axes([0.66,0.12,0.32,0.33],sharex=a1)
+a1.plot(xs,g(xs),"k:",lw=1,label="unknown response")
+a1.plot(xs,m,color="#1f77b4",lw=1.6,label="GP posterior mean μ(x)")
+a1.fill_between(xs,m-1.96*s,m+1.96*s,color="#1f77b4",alpha=0.18,label="μ ± 1.96σ")
+a1.plot(Xo,yo,"o",ms=6,mfc="white",mec="k",label="measured design points")
+a1.axhline(fb,color="gray",ls="--",lw=0.8); a1.text(0.01,fb+0.4,"f* (incumbent)",fontsize=7.5,color="gray")
+a1.set_ylabel("Protease activity (U/L)"); a1.set_ylim(17,41.5); a1.legend(fontsize=7,loc="lower center",ncol=2,frameon=False)
+a1.set_title("(b) One closed-loop cycle (illustrative, one factor)",fontsize=9.5,loc="left",weight="bold")
+plt.setp(a1.get_xticklabels(),visible=False)
+a2.plot(xs,ei,color="#C0392B",lw=1.6); a2.fill_between(xs,0,ei,color="#C0392B",alpha=0.15)
+xn=xs[np.argmax(ei)]; a2.axvline(xn,color="#C0392B",ls="--",lw=1); a1.axvline(xn,color="#C0392B",ls="--",lw=1)
+a2.annotate("next design point\nxₙ₊₁ = argmax EI",xy=(xn,ei.max()),xytext=(xn+0.1 if xn<0.6 else xn-0.42,ei.max()*0.75),fontsize=7.5,color="#C0392B",arrowprops=dict(arrowstyle="->",color="#C0392B"))
+a2.set_ylabel("Expected Improvement (U/L)"); a2.set_xlabel("Scaled factor level (0–1)"); a2.set_ylim(0,ei.max()*1.25)
+for a in (a1,a2): a.spines[["top","right"]].set_visible(False)
+fig.savefig("figures/Fig2_BO_scheme.png",dpi=300,bbox_inches="tight",facecolor="white")
